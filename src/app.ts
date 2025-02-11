@@ -1,17 +1,14 @@
 import express, { Express, Request, Response } from "express";
-import dotenv from "dotenv";
-import { Client } from "pg";
 import router from "./routers";
+import config from './config';
+import bodyParser from "body-parser";
 // import cors from "cors";
 
-dotenv.config();
-
 const app: Express = express();
-const port = process.env.PORT || 3000;
-const DATABASE_URL = process.env.DATABASE_URL;
-export const client = new Client(DATABASE_URL);
+const port = config.PORT || 3000;
 
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: "50mb" }))
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }))
 
 // app.use(
 //   cors({
@@ -29,8 +26,6 @@ app.get("/", (req: Request, res: Response) => {
 app.use(express.json());
 
 async function StartApp() {
-
-    await client.connect().then(() => { console.log('Connected to PostgreSQL database!'); }).catch((err) => { console.error('Error connecting to the database:', err); });
 
     app.use("/api", router);
 
