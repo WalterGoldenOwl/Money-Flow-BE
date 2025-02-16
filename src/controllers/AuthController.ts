@@ -4,7 +4,7 @@ import hashPassword from '../middleware/hashPassword';
 import bcrypt from 'bcrypt';
 import { responseSuccess, responseFailure } from '../utils/Response';
 import { generateAccessToken, generateRefreshToken } from '../middleware/generateToken';
-import UserDTO from '../dto/userDTO';
+import UserDTO from '../dto/UserDTO';
 import config from '../config';
 import jwt from 'jsonwebtoken';
 
@@ -38,8 +38,8 @@ class AuthController {
                 })
                 responseSuccess(res, {
                     user: userDTO,
-                    accessToken: accessToken,
-                    refreshToken: refreshToken,
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
                 });
             } else {
                 responseFailure(res, 400, 'Invalid email or password');
@@ -85,19 +85,19 @@ class AuthController {
 
     async refreshToken(req: Request, res: Response) {
         try {
-            const { refreshToken } = req.body;
-            if (!refreshToken) {
+            const { refresh_token } = req.body;
+            if (!refresh_token) {
                 responseFailure(res, 400, 'Refresh token is required');
                 return
             }
 
-            const payload = jwt.verify(refreshToken, config.REFRESH_TOKEN_PRIVATE_KEY)
+            const payload = jwt.verify(refresh_token, config.REFRESH_TOKEN_PRIVATE_KEY)
             if (!payload) {
                 responseFailure(res, 403, 'Refresh token is not valid');
                 return
             }
 
-            const token = await knex('tokens').where({ refresh_token: refreshToken }).first();
+            const token = await knex('tokens').where({ refresh_token: refresh_token }).first();
             if (!token) {
                 responseFailure(res, 403, 'Refresh token is not valid');
                 return
@@ -110,13 +110,13 @@ class AuthController {
             }
             const accessToken = generateAccessToken(token.user_id);
             const newRefreshToken = generateRefreshToken(token.user_id);
-            await knex('tokens').where({ refresh_token: refreshToken }).update({
+            await knex('tokens').where({ refresh_token: refresh_token }).update({
                 refresh_token: newRefreshToken,
                 expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
             });
             responseSuccess(res, {
-                accessToken: accessToken,
-                refreshToken: newRefreshToken,
+                access_token: accessToken,
+                refresh_token: newRefreshToken,
             });
         } catch (error) {
             console.log(error);
