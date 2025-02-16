@@ -19,8 +19,14 @@ function responseFailure(res: Response, status: number, err?: any): Response {
     })
 }
 
-const paginationData = (res: Response, data: any, status?: number) => {
-    return res.status(status ?? 200).json(data)
+const paginationData = (res: Response, data: any, pagination: any) => {
+    return res.status(200).json({
+        data: data,
+        succeeded: false,
+        pagination: pagination,
+        errorMsg: null,
+        code: 200
+    })
 }
 
 export { responseSuccess, responseFailure, paginationData };

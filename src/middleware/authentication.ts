@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { NextFunction, Request, Response } from 'express';
 import config from '../config';
 import { responseFailure } from '../utils/Response';
+import { log } from 'console';
 
 export default function authenticationMiddleware(req: Request, res: Response, next: NextFunction) {
 
@@ -22,6 +23,7 @@ export default function authenticationMiddleware(req: Request, res: Response, ne
         req.userId = payload.userId
         next()
     } catch (error) {
+        log('error', error);
         responseFailure(res, 403, 'Token is not valid!')
     }
 }
