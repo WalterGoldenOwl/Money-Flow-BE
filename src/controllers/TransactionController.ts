@@ -3,6 +3,7 @@ import { responseSuccess, responseFailure, paginationData } from '../utils/Respo
 import knex from '../db/index';
 import TransactionDTO from '../dto/TransactionDTO';
 import CategoryDTO from '../dto/CategoryDTO';
+import MonthlyReportDTO from '../dto/MonthlyReportDTO';
 
 class TransactionController {
     async createTransaction(req: Request, res: Response) {
@@ -212,7 +213,7 @@ class TransactionController {
             }
 
             if (type) {
-                baseQuery.where('c.type', type);
+                baseQuery.where('c.type', (type as string).toLowerCase());
             }
 
             if (from || to) {
@@ -273,6 +274,42 @@ class TransactionController {
             });
         } catch (error) {
             console.log(error);
+            responseFailure(res, 500, error);
+        }
+    }
+
+    async monthlyReport(req: Request, res: Response) {
+        try {
+            const { month } = req.query;
+            const userId = req.userId;
+
+            if (!month || isNaN(new Date(month as string).getTime())) {
+                responseFailure(res, 400, "Invalid month parameter");
+                return
+            }
+
+            const queryMonth = new Date(month as string);
+            const startOfMonth = new Date(queryMonth.getFullYear(), queryMonth.getMonth(), 1);
+            const endOfMonth = new Date(queryMonth.getFullYear(), queryMonth.getMonth() + 1, 0);
+
+            const totals = await knex('transactions as t')
+                .join('categories as c', 't.category_id', 'c.id')
+                .where('t.user_id', userId)
+                .whereBetween('t.created_at', [startOfMonth, endOfMonth])
+                .select(
+                    knex.raw('COALESCE(SUM(CASE WHEN c.type = ? THEN t.amount ELSE 0 END), 0) as income', ['income']),
+                    knex.raw('COALESCE(SUM(CASE WHEN c.type = ? THEN t.amount ELSE 0 END), 0) as expense', ['expense'])
+                )
+                .first();
+
+            const monthlyReport = new MonthlyReportDTO(
+                Number(totals.income),
+                Number(totals.expense)
+            );
+
+            responseSuccess(res, monthlyReport);
+        } catch (error) {
+            console.log('Error calculating monthly totals:', error);
             responseFailure(res, 500, error);
         }
     }
