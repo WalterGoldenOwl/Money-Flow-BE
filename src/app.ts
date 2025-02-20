@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from "express";
+import express, { Express, NextFunction, Request, Response } from "express";
 import router from "./routers";
 import config from './config';
 import bodyParser from "body-parser";
@@ -9,6 +9,13 @@ const port = config.PORT || 3000;
 
 app.use(bodyParser.json({ limit: "50mb" }))
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }))
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+    res.on('finish', () => {
+        console.log(`API Route: ${req.method} ${req.originalUrl} - Status Code: ${res.statusCode}`);
+    });
+    next();
+});
 
 // app.use(
 //   cors({
