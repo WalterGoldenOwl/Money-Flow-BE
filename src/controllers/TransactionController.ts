@@ -3,7 +3,7 @@ import { responseSuccess, responseFailure, paginationData } from '../utils/Respo
 import knex from '../db/index';
 import TransactionDTO from '../dto/TransactionDTO';
 import CategoryDTO from '../dto/CategoryDTO';
-import MonthlyReportDTO from '../dto/MonthlyReportDTO';
+import TransactionReportDTO from '../dto/TransactionReportDTO';
 
 class TransactionController {
     async createTransaction(req: Request, res: Response) {
@@ -244,7 +244,6 @@ class TransactionController {
                     .first()
             ]);
 
-            // Map dữ liệu sang DTO
             const transactionsDTO = data.map(transaction => new TransactionDTO(
                 transaction.id,
                 transaction.description,
@@ -278,38 +277,47 @@ class TransactionController {
         }
     }
 
-    async monthlyReport(req: Request, res: Response) {
+    async transactionReport(req: Request, res: Response) {
         try {
-            const { month } = req.query;
+            const { from, to } = req.query;
             const userId = req.userId;
 
-            if (!month || isNaN(new Date(month as string).getTime())) {
-                responseFailure(res, 400, "Invalid month parameter");
-                return
+            if (!from || !to ||
+                isNaN(new Date(from as string).getTime()) ||
+                isNaN(new Date(to as string).getTime())) {
+                responseFailure(res, 400, "Invalid date parameters. Both 'from' and 'to' dates are required");
+                return;
             }
 
-            const queryMonth = new Date(month as string);
-            const startOfMonth = new Date(queryMonth.getFullYear(), queryMonth.getMonth(), 1);
-            const endOfMonth = new Date(queryMonth.getFullYear(), queryMonth.getMonth() + 1, 0);
+            const startDate = new Date(from as string);
+            const endDate = new Date(to as string);
+
+            if (startDate > endDate) {
+                responseFailure(res, 400, "'from' date must be before 'to' date");
+                return;
+            }
+
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(23, 59, 59, 999);
 
             const totals = await knex('transactions as t')
                 .join('categories as c', 't.category_id', 'c.id')
                 .where('t.user_id', userId)
-                .whereBetween('t.created_at', [startOfMonth, endOfMonth])
+                .whereBetween('t.created_at', [startDate, endDate])
                 .select(
                     knex.raw('COALESCE(SUM(CASE WHEN c.type = ? THEN t.amount ELSE 0 END), 0) as income', ['income']),
                     knex.raw('COALESCE(SUM(CASE WHEN c.type = ? THEN t.amount ELSE 0 END), 0) as expense', ['expense'])
                 )
                 .first();
 
-            const monthlyReport = new MonthlyReportDTO(
+            const monthlyReport = new TransactionReportDTO(
                 Number(totals.income),
                 Number(totals.expense)
             );
 
             responseSuccess(res, monthlyReport);
         } catch (error) {
-            console.log('Error calculating monthly totals:', error);
+            console.log('Error calculating totals:', error);
             responseFailure(res, 500, error);
         }
     }

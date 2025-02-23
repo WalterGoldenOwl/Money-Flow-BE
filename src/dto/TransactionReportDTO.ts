@@ -1,4 +1,4 @@
-class MonthlyReportDTO {
+class TransactionReportDTO {
     income: number;
     expense: number;
 
@@ -11,4 +11,4 @@ class MonthlyReportDTO {
     }
 }
 
-export default MonthlyReportDTO;
+export default TransactionReportDTO;
