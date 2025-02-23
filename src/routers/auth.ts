@@ -6,6 +6,7 @@ const AuthRouter = express.Router();
 
 AuthRouter.post('/login', AuthController.login);
 AuthRouter.post('/sign-up', AuthController.signUp);
+AuthRouter.post('/user', authenticationMiddleware, AuthController.updateUser);
 AuthRouter.post('/refresh-token', AuthController.refreshToken);
 AuthRouter.delete('/logout', authenticationMiddleware, AuthController.logout);
 
