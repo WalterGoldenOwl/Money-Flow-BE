@@ -30,7 +30,7 @@ class AuthController {
                 const accessToken = generateAccessToken(result.id);
                 const refreshToken = generateRefreshToken(result.id);
 
-                const userDTO = new UserDTO(result.id, result.fullname, result.email);
+                const userDTO = new UserDTO(result.id, result.fullname, result.email, result.avatar, result.currency);
                 await knex('tokens').insert({
                     user_id: result.id,
                     refresh_token: refreshToken,
@@ -75,7 +75,7 @@ class AuthController {
                 password: await hashPassword(password),
             }).returning('*');
             const user = result[0];
-            const userDTO = new UserDTO(user.id, user.fullname, user.email);
+            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency);
             responseSuccess(res, userDTO);
         } catch (error) {
             console.log(error);
@@ -109,14 +109,10 @@ class AuthController {
                 return
             }
             const accessToken = generateAccessToken(token.user_id);
-            const newRefreshToken = generateRefreshToken(token.user_id);
-            await knex('tokens').where({ refresh_token: refresh_token }).update({
-                refresh_token: newRefreshToken,
-                expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-            });
+
             responseSuccess(res, {
                 access_token: accessToken,
-                refresh_token: newRefreshToken,
+                refresh_token: refresh_token,
             });
         } catch (error) {
             console.log(error);
@@ -134,6 +130,40 @@ class AuthController {
             responseFailure(res, 500, error);
         }
     }
+
+    async updateUser(req: Request, res: Response) {
+        try {
+            const { fullname, avatar, currency } = req.body;
+
+            const updateData: Record<string, any> = {
+                fullname: fullname,
+                avatar: avatar,
+                currency: currency,
+                updated_at: knex.fn.now(),
+            };
+
+            Object.keys(updateData).forEach((key) => {
+                if (updateData[key] === null || updateData[key] === undefined) {
+                    delete updateData[key];
+                }
+            });
+
+            await knex('users')
+                .where({ 'id': req.userId })
+                .update(updateData);
+
+            const user = await knex('users')
+                .where({ 'id': req.userId })
+                .first();
+
+            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency);
+
+            responseSuccess(res, userDTO);
+        } catch (error) {
+            console.error('Error updating user:', error);
+            responseFailure(res, 500, 'Internal server error');
+        }
+    };
 }
 
 export default new AuthController();
