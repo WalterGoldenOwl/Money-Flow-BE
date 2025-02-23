@@ -4,7 +4,7 @@ import authenticationMiddleware from '../middleware/authentication';
 
 const TransactionRouter = express.Router();
 
-TransactionRouter.get('/monthly-report', authenticationMiddleware, TransactionController.monthlyReport);
+TransactionRouter.get('/report', authenticationMiddleware, TransactionController.transactionReport);
 
 TransactionRouter.get('/', authenticationMiddleware, TransactionController.getHistoryTransaction);
 TransactionRouter.post('/', authenticationMiddleware, TransactionController.createTransaction);

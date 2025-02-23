@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import e, { Request, Response } from 'express';
 import { responseSuccess, responseFailure } from '../utils/Response';
 import { getWeekRangesInMonth } from '../utils/getWeekRangesInMonth';
 import knex from '../db/index';
@@ -11,22 +11,23 @@ interface TransactionStats {
 class AnalyticController {
     async weekly(req: Request, res: Response) {
         try {
-            const { startDate, type } = req.query;
+            const { start_date, type } = req.query;
 
-            if (!startDate || !type) {
+            if (!start_date || !type) {
                 res.status(400).json({ error: 'Missing required parameters' });
                 return;
             }
 
-            const startDateObj = new Date(startDate as string);
-            const endDateObj = new Date(startDateObj);
-            endDateObj.setDate(endDateObj.getDate() + 7);
+            const startDate = new Date(start_date as string);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 7);
+            endDate.setUTCHours(23, 59, 59, 999);
 
             const baseQuery = knex('transactions')
                 .where('transactions.user_id', req.userId)
                 .join('categories', 'transactions.category_id', 'categories.id')
                 .where('categories.type', (type as string).toLowerCase())
-                .whereBetween('transactions.created_at', [startDateObj, endDateObj]);
+                .whereBetween('transactions.created_at', [startDate, endDate]);
 
             const dailyTotalsPromise = baseQuery
                 .clone()
@@ -69,20 +70,20 @@ class AnalyticController {
 
     async monthly(req: Request, res: Response) {
         try {
-            const { startDate, type } = req.query;
+            const { start_date, type } = req.query;
 
-            if (!startDate || !type) {
+            if (!start_date || !type) {
                 res.status(400).json({ error: 'Missing required parameters' });
                 return;
             }
 
-            const startDateObj = new Date(startDate as string);
-            if (isNaN(startDateObj.getTime())) {
+            const startDate = new Date(start_date as string);
+            if (isNaN(startDate.getTime())) {
                 res.status(400).json({ error: 'Invalid date format' });
                 return;
             }
 
-            const weekRanges = getWeekRangesInMonth(startDateObj);
+            const weekRanges = getWeekRangesInMonth(startDate);
 
             console.log(weekRanges);
 
@@ -150,6 +151,7 @@ class AnalyticController {
 
             const startDate = new Date(Number(year), 0, 1);
             const endDate = new Date(Number(year), 11, 31);
+            endDate.setUTCHours(23, 59, 59, 999);
 
             const baseQuery = knex('transactions')
                 .where('transactions.user_id', req.userId)

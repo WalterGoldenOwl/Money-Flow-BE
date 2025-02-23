@@ -20,7 +20,7 @@ export function getWeekRangesInMonth(startDate: Date): WeekRange[] {
     } else {
         endOfWeek.setUTCDate(endOfWeek.getUTCDate() + (7 - endOfWeek.getUTCDay()));
     }
-    weeks.push({ start: new Date(startOfWeek), end: new Date(endOfWeek) });
+    weeks.push({ start: new Date(startOfWeek), end: new Date(endOfWeek.setUTCHours(23, 59, 59, 999)) });
 
     startOfWeek.setUTCDate(endOfWeek.getUTCDate() + 1);
     while (startOfWeek <= lastDayOfMonth) {
@@ -31,7 +31,7 @@ export function getWeekRangesInMonth(startDate: Date): WeekRange[] {
             endOfWeek = new Date(lastDayOfMonth);
         }
 
-        weeks.push({ start: new Date(startOfWeek), end: new Date(endOfWeek) });
+        weeks.push({ start: new Date(startOfWeek), end: new Date(endOfWeek.setUTCHours(23, 59, 59, 999)) });
         startOfWeek.setUTCDate(startOfWeek.getUTCDate() + 7);
     }
 
