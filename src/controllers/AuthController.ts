@@ -148,14 +148,12 @@ class AuthController {
                 }
             });
 
-            await knex('users')
+            const response = await knex('users')
                 .where({ 'id': req.userId })
-                .update(updateData);
+                .update(updateData)
+                .returning('*');
 
-            const user = await knex('users')
-                .where({ 'id': req.userId })
-                .first();
-
+            const user = response[0];
             const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency);
 
             responseSuccess(res, userDTO);

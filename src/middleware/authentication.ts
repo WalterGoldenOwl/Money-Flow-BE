@@ -7,6 +7,9 @@ import { log } from 'console';
 export default function authenticationMiddleware(req: Request, res: Response, next: NextFunction) {
 
     const authHeader = req.headers['authorization']
+    const deviceID = req.headers['device-id'];
+
+    req.deviceID = deviceID;
 
     const token = authHeader && authHeader.split(' ')[1]
 

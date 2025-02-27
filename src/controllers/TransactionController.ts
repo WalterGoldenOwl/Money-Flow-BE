@@ -4,6 +4,8 @@ import knex from '../db/index';
 import TransactionDTO from '../dto/TransactionDTO';
 import CategoryDTO from '../dto/CategoryDTO';
 import TransactionReportDTO from '../dto/TransactionReportDTO';
+import NotificationController from './NotificationController';
+import Notification from '../models/Notification';
 
 class TransactionController {
     async createTransaction(req: Request, res: Response) {
@@ -37,10 +39,12 @@ class TransactionController {
                 })
                 .returning('*');
 
-            const category = await knex('categories')
-                .where('id', category_id)
-                .select('*')
-                .first();
+            var response = await Promise.all([
+                knex('categories').where('id', category_id).select('*').first(),
+                NotificationController.addNotification(new Notification(req.userId, category_id, transaction.id, 'transaction'))
+            ]);
+
+            const category = response[0];
 
             const transactionDTO = new TransactionDTO(
                 transaction.id,
@@ -133,10 +137,7 @@ class TransactionController {
             });
 
             const [updatedTransaction] = await knex('transactions')
-                .where({
-                    'id': transactionID,
-                    'user_id': req.userId
-                })
+                .where({ 'id': transactionID, 'user_id': req.userId })
                 .update(updateData)
                 .returning('*');
 
