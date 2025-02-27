@@ -2,7 +2,14 @@ import express, { Express, NextFunction, Request, Response } from "express";
 import router from "./routers";
 import config from './config';
 import bodyParser from "body-parser";
+import * as admin from 'firebase-admin';
 // import cors from "cors";
+
+var serviceAccount = require("../firebase.config.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
 
 const app: Express = express();
 const port = config.PORT || 3000;
