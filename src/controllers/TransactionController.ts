@@ -78,7 +78,13 @@ class TransactionController {
             }
 
             const transaction = await knex('transactions as t')
-                .select('t.*', 'c.*')
+                .select(
+                    't.*',
+                    'c.id as category_id',
+                    'c.name as category_name',
+                    'c.icon as category_icon',
+                    'c.type as category_type'
+                )
                 .leftJoin('categories as c', 't.category_id', 'c.id')
                 .where({ 't.id': transactionID, 't.user_id': req.userId })
                 .first();
@@ -89,19 +95,19 @@ class TransactionController {
             }
 
             const transactionDTO = new TransactionDTO(
-                transaction.id,
+                Number(transactionID),
                 transaction.description,
                 transaction.attachment,
                 new CategoryDTO(
                     transaction.category_id,
-                    transaction.name,
-                    transaction.icon,
-                    transaction.type
+                    transaction.category_name,
+                    transaction.category_icon,
+                    transaction.category_type
                 ),
                 transaction.amount,
                 transaction.created_at,
                 transaction.updated_at,
-                transaction.created_at
+                transaction.date_created
             );
 
             responseSuccess(res, transactionDTO);
@@ -136,8 +142,19 @@ class TransactionController {
                 }
             });
 
+            var oldCategory = null
+
+            if (category_id) {
+                const transactionBeforeUpdate = await knex('transactions')
+                    .where({ id: transactionID, user_id: req.userId })
+                    .first();
+                if (category_id != transactionBeforeUpdate.category_id) {
+                    oldCategory = transactionBeforeUpdate.category_id
+                }
+            }
+
             const [updatedTransaction] = await knex('transactions')
-                .where({ 'id': transactionID, 'user_id': req.userId })
+                .where({ id: transactionID, user_id: req.userId })
                 .update(updateData)
                 .returning('*');
 
@@ -146,10 +163,10 @@ class TransactionController {
                 return;
             }
 
-            const category = await knex('categories')
-                .where('id', updatedTransaction.category_id)
-                .select('*')
-                .first();
+            const [category] = await Promise.all([
+                knex('categories').where('id', updatedTransaction.category_id).select('*').first(),
+                NotificationController.addNotification(new Notification(req.userId, category_id, Number(transactionID), oldCategory ? 'move' : "update", oldCategory))
+            ])
 
             const transactionDTO = new TransactionDTO(
                 updatedTransaction.id,
@@ -182,9 +199,11 @@ class TransactionController {
                 return
             }
 
-            const result = await knex('transactions')
-                .where({ 'id': transactionID, 'user_id': req.userId })
-                .delete()
+            const [result] = await Promise.all([
+                knex('transactions').where({ 'id': transactionID, 'user_id': req.userId }).delete(),
+                knex('notifications').where({ 'user_id': req.userId, 'transaction_id': transactionID }).delete(),
+            ])
+
             responseSuccess(res, result);
         } catch (error) {
             console.log(error);
