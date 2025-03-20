@@ -199,9 +199,11 @@ class TransactionController {
                 return
             }
 
-            const result = await knex('transactions')
-                .where({ 'id': transactionID, 'user_id': req.userId })
-                .delete()
+            const [result] = await Promise.all([
+                knex('transactions').where({ 'id': transactionID, 'user_id': req.userId }).delete(),
+                knex('notifications').where({ 'user_id': req.userId, 'transaction_id': transactionID }).delete(),
+            ])
+
             responseSuccess(res, result);
         } catch (error) {
             console.log(error);
