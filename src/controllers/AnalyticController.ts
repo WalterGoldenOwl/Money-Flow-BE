@@ -149,9 +149,8 @@ class AnalyticController {
                 return;
             }
 
-            const startDate = new Date(Number(year), 0, 1);
-            const endDate = new Date(Number(year), 11, 31);
-            endDate.setUTCHours(23, 59, 59, 999);
+            const startDate = new Date(Date.UTC(Number(year), 0, 1));
+            const endDate = new Date(Date.UTC(Number(year), 11, 31, 23, 59, 59, 999));
 
             const baseQuery = knex('transactions')
                 .where('transactions.user_id', req.userId)
