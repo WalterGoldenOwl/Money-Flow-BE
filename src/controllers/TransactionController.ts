@@ -297,6 +297,68 @@ class TransactionController {
         }
     }
 
+    async exportTransaction(req: Request, res: Response) {
+        try {
+            const { from, to } = req.query;
+
+            if (!from || !to ||
+                isNaN(new Date(from as string).getTime()) ||
+                isNaN(new Date(to as string).getTime())) {
+                responseFailure(res, 400, "Invalid date parameters. Both 'from' and 'to' dates are required");
+                return;
+            }
+
+            const baseQuery = knex('transactions as t')
+                .leftJoin('categories as c', 't.category_id', 'c.id')
+                .where('t.user_id', req.userId)
+                .orderBy('t.date_created', 'desc')
+                .select([
+                    't.*',
+                    'c.name as category_name',
+                    'c.icon as category_icon',
+                    'c.type as category_type'
+                ]);
+
+            const fromDate = from ? new Date(from as string) : null;
+            let toDate = to ? new Date(to as string) : null;
+
+            if (toDate) {
+                toDate.setHours(23, 59, 59, 999);
+            }
+
+            if (fromDate && toDate) {
+                baseQuery.whereBetween('t.date_created', [fromDate, toDate]);
+            } else {
+                if (fromDate) baseQuery.where('t.date_created', '>=', fromDate);
+                if (toDate) baseQuery.where('t.date_created', '<=', toDate);
+            }
+
+            const data = await baseQuery.clone()
+
+            const transactionsDTO = data.map(transaction => new TransactionDTO(
+                transaction.id,
+                transaction.description,
+                transaction.attachment,
+                new CategoryDTO(
+                    transaction.category_id,
+                    transaction.category_name,
+                    transaction.category_icon,
+                    transaction.category_type
+                ),
+                transaction.amount,
+                transaction.created_at,
+                transaction.updated_at,
+                transaction.date_created
+            ));
+
+
+            responseSuccess(res, transactionsDTO);
+        } catch (error) {
+            console.log(error);
+            responseFailure(res, 500, error);
+        }
+    }
+
     async transactionReport(req: Request, res: Response) {
         try {
             const { from, to } = req.query;
