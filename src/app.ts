@@ -1,7 +1,6 @@
 import express, { Express, NextFunction, Request, Response } from "express";
 import router from "./routers";
 import config from './config';
-import bodyParser from "body-parser";
 import * as admin from 'firebase-admin';
 // import cors from "cors";
 
@@ -14,8 +13,8 @@ admin.initializeApp({
 const app: Express = express();
 const port = config.PORT || 3000;
 
-app.use(bodyParser.json({ limit: "50mb" }))
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }))
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
     res.on('finish', () => {
@@ -36,8 +35,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.get("/", (req: Request, res: Response) => {
     res.send("Express + TypeScript Server");
 });
-
-app.use(express.json());
 
 async function StartApp() {
 

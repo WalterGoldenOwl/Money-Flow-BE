@@ -91,13 +91,17 @@ class NotificationController {
 
             const baseQuery = knex('notifications as n')
                 .leftJoin('categories as c', 'n.category_id', 'c.id')
+                .leftJoin('categories as fc', 'n.from_category_id', 'fc.id')
                 .where({ 'user_id': req.userId })
                 .orderBy('created_at', 'desc')
                 .select([
                     'n.*',
                     'c.name as category_name',
                     'c.icon as category_icon',
-                    'c.type as category_type'
+                    'c.type as category_type',
+                    'fc.name as from_category_name',
+                    'fc.icon as from_category_icon',
+                    'fc.type as from_category_type'
                 ])
 
             const [data, totalResult] = await Promise.all([
@@ -124,7 +128,13 @@ class NotificationController {
                 notification.transaction_id,
                 notification.is_read,
                 notification.created_at,
-                notification.updated_at
+                notification.updated_at,
+                notification.from_category_id ? new CategoryDTO(
+                    notification.from_category_id,
+                    notification.from_category_name,
+                    notification.from_category_icon,
+                    notification.from_category_type
+                ) : null
             ))
 
             const total = Number(totalResult?.total) || 0;
@@ -170,26 +180,29 @@ class NotificationController {
 
     async addNotification(notification: Notification) {
         try {
-            var response = await Promise.all([
+            var [_, category, oldCategory] = await Promise.all([
                 knex('notifications').insert(notification),
-                knex('categories').where({ 'id': notification.category_id }).first()
+                knex('categories').where({ 'id': notification.category_id }).first(),
+                notification.from_category_id ? knex('categories').where({ 'id': notification.from_category_id }).first() : null
             ])
 
-            const category = response[1]
-
             if (!category) return
+
             var body = ''
-            switch (category.type) {
-                case "expense":
-                    body = `You just paid your ${(category.name as string).toLowerCase()} bill`
+            switch (notification.type) {
+                case "transaction":
+                    if (category.type = "expense ") body = `You just paid your ${category.name.toLowerCase()} bill`
+                    else body = `You just received your ${category.name.toLowerCase()} income`
+                    break;
+                case "move":
+                    body = `You have just moved transaction from the ${oldCategory.name.toLowerCase()} category to the ${category.name.toLowerCase()} category.`
                     break;
 
-                case "income":
-                    body = `You just received your ${(category.name as string).toLowerCase()} income`
-
-                default:
+                case "update":
+                    body = `Your ${category.name.toLowerCase()} has been updated`
                     break;
             }
+
             this.pushNotification(notification.user_id, category.name, body)
         } catch (error) {
             console.log(error);
