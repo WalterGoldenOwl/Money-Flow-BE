@@ -6,9 +6,11 @@ const AuthRouter = express.Router();
 
 AuthRouter.get('/check-user', AuthController.checkUser);
 AuthRouter.post('/login', AuthController.login);
+AuthRouter.post('/login-with-google', AuthController.loginWithGoogle);
 AuthRouter.post('/sign-up/verify', authenticationMiddleware('sign-up'), AuthController.verifyAccount);
 AuthRouter.post('/sign-up', AuthController.signUp);
 AuthRouter.post('/resend-otp', AuthController.resendOTP);
+AuthRouter.post('/add-password', authenticationMiddleware('access'), AuthController.addPassword);
 AuthRouter.post('/forgot-password', authenticationMiddleware('forgot-password'), AuthController.forgotPassword);
 AuthRouter.post('/change-password/confirm', authenticationMiddleware('change-password'), AuthController.confirmPassword);
 AuthRouter.post('/change-password', authenticationMiddleware('access'), AuthController.changePassword);

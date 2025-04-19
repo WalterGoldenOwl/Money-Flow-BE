@@ -8,6 +8,7 @@ import UserDTO from '../dto/UserDTO';
 import config from '../config';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
 
 const transporter = nodemailer.createTransport({
     service: config.EMAIL_SERVICE,
@@ -16,6 +17,8 @@ const transporter = nodemailer.createTransport({
         pass: config.EMAIL_PASS,
     },
 });
+
+const client = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
 class AuthController {
     async login(req: Request, res: Response) {
@@ -44,7 +47,7 @@ class AuthController {
                 const accessToken = generateAccessToken(result.id);
                 const refreshToken = generateRefreshToken(result.id);
 
-                const userDTO = new UserDTO(result.id, result.fullname, result.email, result.avatar, result.currency, result.country, result.language);
+                const userDTO = new UserDTO(result.id, result.fullname, result.email, result.avatar, result.currency, result.country, result.language, result.is_need_password);
                 await knex('tokens').insert({
                     user_id: result.id,
                     refresh_token: refreshToken,
@@ -61,6 +64,78 @@ class AuthController {
         } catch (error) {
             console.log(error);
             responseFailure(res, 500, error);
+        }
+    }
+
+    async loginWithGoogle(req: Request, res: Response) {
+        const { token, country, language } = req.body;
+        try {
+            const ticket = await client.verifyIdToken({
+                idToken: token,
+                audience: config.GOOGLE_CLIENT_ID,
+            });
+            const payload = ticket.getPayload();
+
+            if (!payload) {
+                responseFailure(res, 401, 'Invalid token');
+                return
+            }
+
+            const { sub: googleId, email, name, picture } = payload;
+
+            const user = await knex('users').whereRaw('LOWER(email) = LOWER(?)', [email]).first();
+            var newUser: any = null;
+
+            if (!user) {
+                newUser = await knex('users').insert({
+                    fullname: name,
+                    email: email,
+                    avatar: picture,
+                    google_id: googleId,
+                    is_verify: true,
+                    sign_up_type: 'google',
+                    country: country,
+                    language: language,
+                    is_need_password: true,
+                    verified_at: new Date()
+                }).returning('*');
+            } else {
+                const updateData: Record<string, any> = {};
+
+                if (user.google_id === null) updateData.google_id = googleId;
+
+                if (user.is_verify === false) {
+                    updateData.is_verify = true;
+                    updateData.verified_at = new Date();
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                    newUser = await knex('users')
+                        .where({ id: user.id })
+                        .update(updateData)
+                        .returning('*');
+                } else {
+                    newUser = [user];
+                }
+            }
+
+            const userDTO = new UserDTO(newUser[0].id, newUser[0].fullname, newUser[0].email, newUser[0].avatar, newUser[0].currency, newUser[0].country, newUser[0].language, newUser[0].is_need_password);
+            const accessToken = generateAccessToken(newUser[0].id);
+            const refreshToken = generateRefreshToken(newUser[0].id);
+
+            await knex('tokens').insert({
+                user_id: newUser[0].id,
+                refresh_token: refreshToken,
+                expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+            })
+            responseSuccess(res, {
+                user: userDTO,
+                access_token: accessToken,
+                refresh_token: refreshToken,
+            });
+        } catch (error) {
+            console.error('Error verifying token:', error);
+            responseFailure(res, 401, 'Invalid token');
         }
     }
 
@@ -91,7 +166,7 @@ class AuthController {
                 language: language,
             }).returning('*');
             const user = result[0];
-            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language);
+            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language, user.is_need_password);
 
             const otp = Math.floor(100000 + Math.random() * 900000);
             const otpExpier = new Date();
@@ -171,7 +246,7 @@ class AuthController {
             const accessToken = generateAccessToken(updatedUser.id);
             const refreshToken = generateRefreshToken(updatedUser.id);
 
-            const userDTO = new UserDTO(updatedUser.id, updatedUser.fullname, updatedUser.email, updatedUser.avatar, updatedUser.currency, updatedUser.country, updatedUser.language);
+            const userDTO = new UserDTO(updatedUser.id, updatedUser.fullname, updatedUser.email, updatedUser.avatar, updatedUser.currency, updatedUser.country, updatedUser.language, updatedUser.is_need_password);
 
             await knex('tokens').insert({
                 user_id: updatedUser.id,
@@ -260,7 +335,7 @@ class AuthController {
                 .returning('*');
 
             const user = response[0];
-            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language);
+            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language, user.is_need_password);
 
             responseSuccess(res, userDTO);
         } catch (error) {
@@ -301,7 +376,7 @@ class AuthController {
                 .returning('*');
 
             const user = response[0];
-            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language);
+            const userDTO = new UserDTO(user.id, user.fullname, user.email, user.avatar, user.currency, user.country, user.language, user.is_need_password);
 
             responseSuccess(res, userDTO);
         } catch (error) {
@@ -328,7 +403,7 @@ class AuthController {
                 return
             }
 
-            const userDTO = new UserDTO(result.id, result.fullname, result.email, result.avatar, result.currency, result.country, result.language);
+            const userDTO = new UserDTO(result.id, result.fullname, result.email, result.avatar, result.currency, result.country, result.language, result.is_need_password);
 
             responseSuccess(res, userDTO);
         } catch (error) {
@@ -441,7 +516,8 @@ class AuthController {
                 updatedUser.avatar,
                 updatedUser.currency,
                 updatedUser.country,
-                updatedUser.language
+                updatedUser.language,
+                updatedUser.is_need_password
             );
 
             responseSuccess(res, userDTO);
@@ -547,7 +623,7 @@ class AuthController {
             const updatedUser = await knex.transaction(async trx => {
                 const [user] = await trx('users')
                     .where({ id: req.userId })
-                    .update({ password: result.temp_password })
+                    .update({ password: result.temp_password, is_need_password: false })
                     .returning('*');
 
                 await trx('otps')
@@ -558,7 +634,7 @@ class AuthController {
                 return user;
             });
 
-            const userDTO = new UserDTO(updatedUser.id, updatedUser.fullname, updatedUser.email, updatedUser.avatar, updatedUser.currency, updatedUser.country, updatedUser.language);
+            const userDTO = new UserDTO(updatedUser.id, updatedUser.fullname, updatedUser.email, updatedUser.avatar, updatedUser.currency, updatedUser.country, updatedUser.language, updatedUser.is_need_password);
 
             responseSuccess(res, userDTO);
         } catch (error) {
@@ -566,6 +642,69 @@ class AuthController {
             responseFailure(res, 500, 'Internal server error');
         }
     };
+
+    async addPassword(req: Request, res: Response) {
+        try {
+            const { password } = req.body;
+
+            if (!password) {
+                responseFailure(res, 400, 'Password is required');
+                return
+            }
+
+            const resultUser = await knex('users').where({ id: req.userId }).first();
+
+            if (!resultUser) {
+                responseFailure(res, 404, 'User not found');
+                return
+            }
+
+            if (!resultUser.is_need_password) {
+                responseFailure(res, 400, 'User already has a password');
+                return
+            }
+
+            if (resultUser.sign_up_type !== "google") {
+                responseFailure(res, 400, "Account isn't login with Google");
+                return
+            }
+
+            const hashedPassword = await hashPassword(password);
+            const otp = Math.floor(100000 + Math.random() * 900000);
+            const otpExpier = new Date();
+            otpExpier.setMinutes(otpExpier.getMinutes() + 2);
+            await knex.transaction(async trx => {
+                await trx('otps')
+                    .where({ user_id: req.userId, email: resultUser.email, type: 'change-password' })
+                    .del();
+                await trx('otps').insert({
+                    email: resultUser.email,
+                    user_id: req.userId,
+                    otp: otp,
+                    type: 'change-password',
+                    expired_at: otpExpier,
+                    temp_password: hashedPassword,
+                });
+            });
+            const accessToken = generateTemptAccessToken(resultUser.id, "change-password");
+            const mailOptions = {
+                from: config.EMAIL_USER,
+                to: resultUser.email,
+                subject: 'Add Password OTP',
+                text: `Your OTP (It will expire after 2 minutes): ${otp}`,
+            };
+            await new Promise((resolve, reject) => {
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) return reject(err);
+                    resolve(info);
+                });
+            });
+            responseSuccess(res, { access_token: accessToken });
+        } catch (error) {
+            console.error('Error in addPassword:', error);
+            responseFailure(res, 500, 'Internal server error');
+        }
+    }
 }
 
 export default new AuthController();
